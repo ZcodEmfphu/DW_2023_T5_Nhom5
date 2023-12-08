@@ -17,6 +17,7 @@ public class LoadFile {
     int batchSize = 20;
     Connection connStaging;
     Connection connControl;
+
     public void loadData(String csvFilePath) throws SQLException {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
@@ -37,7 +38,7 @@ public class LoadFile {
             } catch (FileNotFoundException e) {
                 throw new RuntimeException(e);
             }
-            // 3. insert table Log
+            // 3. insert table Log Lấy dữ liệu từ file csv xuống staging với id = 4
             insertLog("Load Data To Staging", "Lấy dữ liệu từ file csv xuống staging", 4, findIdByFileName(file.getName()));
             // 4.Truncate bảng temp
             String truncateSQL = "TRUNCATE TABLE temp";
@@ -45,7 +46,6 @@ public class LoadFile {
             truncateStatement.executeUpdate();
             // 5. Write command sql to insert data to temp
             String sql = "INSERT INTO temp (Date, Time, Product, BuyingPrice, SellingPrice) VALUES (?, ?, ?, ?, ?)";
-
             try {
                 // 6. Run sql
                 PreparedStatement statement = connStaging.prepareStatement(sql);
@@ -76,7 +76,7 @@ public class LoadFile {
                     }
                     lineReader.close();
                     statement.executeBatch();
-                    // 11. Insert table Log
+                    // 11. Insert table Log Dữ liệu đã được truyền với id = 5
                     insertLog("Load data to staging", "Dữ liệu đã được truyền", 5, findIdByFileName(file.getName()));
 
                 } catch (IOException e) {
@@ -87,15 +87,17 @@ public class LoadFile {
                 connStaging.commit();
                 connStaging.close();
             } catch (SQLException e) {
-                // 7. insert table Log
+                // 7. insert table Log với id =10
                 insertLog("Error", "Lỗi load dữ liệu", 10, findIdByFileName(file.getName()));
                 throw new RuntimeException(e);
             }
+            // 12. Chuyển file csv sang thư mục khác
             String targetDirectory = "D:\\DataWarehouse\\Archive";
             moveFileToAnotherDirectory(csvFilePath, targetDirectory);
         }
     }
 
+    // hàm insertLog
     private void insertLog(String title, String description, int status, int configId) {
         String sql = "Insert Into Log(Time, Title, Description, Config_Id, Status) values (NOW(),?,?,?, ?)";
         try {
@@ -110,6 +112,7 @@ public class LoadFile {
         }
     }
 
+    // Hàm kiểm tra process có đang chạy
     private boolean checkProcess() {
         if (getNewStatus().equals("Crawling")) return true;
         else if (getNewStatus().equals("Extracting")) return true;
@@ -117,6 +120,7 @@ public class LoadFile {
         else return false;
     }
 
+    // hàm lấy trang thái mới nhất từ bảng log
     private String getNewStatus() {
         String st = "";
         String sql = "SELECT status.status FROM status, log  WHERE log.time = (SELECT MAX(log.time) FROM log) and log.status = status.id";
@@ -132,6 +136,7 @@ public class LoadFile {
         return st;
     }
 
+    // Hàm tìm kiếm Id trong Config
     private int findIdByFileName(String fileName) {
         String sql = "select Id from Config where FileName = ?";
         try {
@@ -139,14 +144,14 @@ public class LoadFile {
             stm.setString(1, fileName);
             ResultSet rs = stm.executeQuery();
             rs.next();
-                return rs.getInt(1);
+            return rs.getInt(1);
 
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
 
-    // 12. hàm di chuyển file csv sang thư mục khác
+    // hàm di chuyển file csv sang thư mục khác
     private void moveFileToAnotherDirectory(String csvFilePath, String targetDirectory) {
         File sourceFile = new File(csvFilePath);
         File targetDirectoryFile = new File(targetDirectory);
@@ -167,28 +172,12 @@ public class LoadFile {
             throw new RuntimeException("Không thể di chuyển file: " + e.getMessage(), e);
         }
     }
-    private void insertConfig(String process, String source, String title, String fileName, int status) throws SQLException {
-        connControl = DriverManager.getConnection(jdbcURLControl, username, password);
-        String sql = "Insert Into Config(Process, Source, Username, Password, Port, Title, FileName, Status, Flag ) values (?,?, ?,?,3306,?,?,?, 'False')";
-        try {
-            PreparedStatement statement = connControl.prepareStatement(sql);
-            statement.setString(1, process);
-            statement.setString(2,source);
-            statement.setString(3,"root");
-            statement.setString(4,"");
-            statement.setString(5,title);
-            statement.setString(6, fileName);
-            statement.setInt(7,status);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
 
     public static void main(String[] args) throws SQLException {
         LoadFile loadFile = new LoadFile();
         File directory = new File("D:\\Documents\\DataWarehouse");
+        // lấy toàn bộ file csv
         if (directory.exists() && directory.isDirectory()) {
             File[] files = directory.listFiles();
             Arrays.sort(files, Comparator.comparingLong(File::lastModified));
