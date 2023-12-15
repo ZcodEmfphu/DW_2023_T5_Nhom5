@@ -1,6 +1,6 @@
-package main.db;
+package db;
 
-import main.model.Gold;
+import model.Gold;
 
 import java.sql.*;
 import java.util.ArrayList;
