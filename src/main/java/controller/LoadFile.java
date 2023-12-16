@@ -1,4 +1,4 @@
-package org.example;
+package controller;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -41,8 +41,8 @@ public class LoadFile {
             insertLog("Load Data To Staging", "Lấy dữ liệu từ file csv xuống staging", 4, findIdByFileName(file.getName()));
             // 4.Truncate bảng temp
             String truncateSQL = "TRUNCATE TABLE temp";
-//            PreparedStatement truncateStatement = connStaging.prepareStatement(truncateSQL);
-//            truncateStatement.executeUpdate();
+            PreparedStatement truncateStatement = connStaging.prepareStatement(truncateSQL);
+            truncateStatement.executeUpdate();
             // 5. Write command sql to insert data to temp
             String sql = "INSERT INTO temp (Date, Time, Product, BuyingPrice, SellingPrice) VALUES (?, ?, ?, ?, ?)";
 
