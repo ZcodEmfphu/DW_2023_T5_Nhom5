@@ -268,7 +268,7 @@ public class LoadFromTempToDataWareHouse {
       String selectQuery =
               "SELECT date_dim.d_id, temp.Id, temp.BuyingPrice, temp.SellingPrice, CURRENT_TIME() AS Time "
                       + "FROM giavang_staging.temp "
-                      + "JOIN giavang_datawarehouse.date_dim ON temp.Date = date_dim.full_date";
+                      + "JOIN giavang_datawarehouse.date_dim ON STR_TO_DATE(temp.Date, '%d/%m/%Y') = date_dim.full_date";
 
       // Câu truy vấn SQL để chèn dữ liệu vào bảng data warehouse
       String insertQuery =
