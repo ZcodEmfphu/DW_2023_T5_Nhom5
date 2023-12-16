@@ -266,7 +266,7 @@ public class LoadFromTempToDataWareHouse {
     // Ghi log thông báo bắt đầu quá trình tải dữ liệu
     log.insertLog("Loading", "Data Loading TEMP to Product_fact ", 1, 7);
     log.logInfo("Đang tải dữ liệu....");
-
+    System.out.println("hbdjd");
     // Chờ trong khoảng thời gian đã định
     while (System.currentTimeMillis() - startTime < duration) {
       try {
@@ -291,6 +291,7 @@ public class LoadFromTempToDataWareHouse {
               + "JOIN giavang_datawarehouse.date_dim ON temp.Date = date_dim.full_date";
 
       // Câu truy vấn SQL để chèn dữ liệu vào bảng data warehouse
+
       String insertQuery =
           "INSERT INTO giavang_datawarehouse.product_fact (Date_ef, Time, Date_ex, Product_Id, BuyingPrice, SellingPrice, Status) "
               + "VALUES (?, ?, 7585, ?, ?, ?, 8)";
@@ -303,9 +304,9 @@ public class LoadFromTempToDataWareHouse {
 
         // Xử lý kết quả và chèn dữ liệu vào bảng data warehouse
         while (resultSet.next()) {
-
-          int date_ef = resultSet.getInt("d_id");
-          int tempId = resultSet.getInt("Id");
+          System.out.println(1);
+          int date_ef = resultSet.getInt(1);
+          int tempId = resultSet.getInt(2);
           String time = resultSet.getString("Time");
           String buyingPrice = resultSet.getString("BuyingPrice");
           String sellingPrice = resultSet.getString("SellingPrice");
@@ -335,5 +336,6 @@ public class LoadFromTempToDataWareHouse {
       log.insertLog("Load Data", "Lỗi không mong muốn: " + e.getMessage(), 1, 9);
     }
   }
+
 
 }
