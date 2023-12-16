@@ -24,7 +24,7 @@ public class Dao {
 
         String sql = "SELECT time,Date_ef, Product_Name, BuyingPrice, SellingPrice " +
                 "from aggregate where time = (select max(time) " +
-                "from aggregate where Date_ef = (SELECT MAX(Date_ef) from aggregate))";
+                "from aggregate where Date_ef = (SELECT MAX(Date_ef) from aggregate)) and Date_ef = (SELECT MAX(Date_ef) from aggregate)";
         PreparedStatement stm = conn.prepareStatement(sql);
         ResultSet rs = stm.executeQuery();
         while (rs.next()){

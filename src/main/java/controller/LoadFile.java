@@ -1,4 +1,4 @@
-package org.example;
+package controller;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -20,6 +20,7 @@ public class LoadFile {
     public void loadData(String csvFilePath) throws SQLException {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
+
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -166,6 +167,24 @@ public class LoadFile {
             throw new RuntimeException("Không thể di chuyển file: " + e.getMessage(), e);
         }
     }
+    private void insertConfig(String process, String source, String title, String fileName, int status) throws SQLException {
+        connControl = DriverManager.getConnection(jdbcURLControl, username, password);
+        String sql = "Insert Into Config(Process, Source, Username, Password, Port, Title, FileName, Status, Flag ) values (?,?, ?,?,3306,?,?,?, 'False')";
+        try {
+            PreparedStatement statement = connControl.prepareStatement(sql);
+            statement.setString(1, process);
+            statement.setString(2,source);
+            statement.setString(3,"root");
+            statement.setString(4,"");
+            statement.setString(5,title);
+            statement.setString(6, fileName);
+            statement.setInt(7,status);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
     public static void main(String[] args) throws SQLException {
         LoadFile loadFile = new LoadFile();
