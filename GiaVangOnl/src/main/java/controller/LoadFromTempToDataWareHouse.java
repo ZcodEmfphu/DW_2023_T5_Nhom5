@@ -19,7 +19,109 @@ public class LoadFromTempToDataWareHouse {
   private static long startTime = System.currentTimeMillis();
   private static long duration = 0 * 60 * 1000;
 
-  //2. Load dữ liệu vào bảng product_dim
+  //2. Kiểm tra sản phẩm tồn tại trong table
+  public static boolean hasDataInProductDim() {
+    // 2.1. Kiểm tra kết nối với datawarehouse database
+    try (Connection dataWarehouseConnection = cof.connectToDatabase("datawarehouse")) {
+      // Câu lệnh đếm số sản phẩm trong table product_dim của datawareehouse database
+      String countQuery = "SELECT COUNT(*) FROM Product_dim";
+      // Thực thi câu lệnh
+      try (PreparedStatement countStatement = dataWarehouseConnection.prepareStatement(countQuery)) {
+        ResultSet resultSet = countStatement.executeQuery();
+        // Nếu kết quả phẩn tử đầu tiên
+        if (resultSet.next()) {
+          int count = resultSet.getInt(1);// Có tồn tại
+          return count > 0;// Trả về lớn hơn 0
+        }
+      }
+    } catch (SQLException e) {
+      // Thông báo lỗi log hệ thống
+      log.logError("Error checking data in Product_dim: " + e.getMessage(), e);
+    }
+    return false;
+  }
+
+  //5. Load Data từ Temp sang Table Product_dim
+  public static void loadDataFromTempToProductDim() {
+    try {
+      // Kiểm tra xem Product_dim có dữ liệu không
+      if (hasDataInProductDim()) {
+        // Nếu có dữ liệu, cập nhật dữ liệu từ TEMP vào Product_dim
+        updateDataFromTempToProductDim();
+        log.logInfo("Dữ liệu của Product_dim đã được cập nhật");
+        log.insertLog("Tranform", "Dữ liệu của Product_dim đã được cập nhật", 1, 6);
+      } else {
+        // Nếu không có dữ liệu, tải dữ liệu từ TEMP vào Product_dim
+        insertDataFromTempToProductDim();
+        log.logInfo("Tải dữ liệu từ temp sang Product_dim thành công");
+        log.insertLog("Loaded", "Tải dữ liệu từ temp sang Product_dim thành công", 1, 8);
+      }
+      log.logInfo("Load and update process completed successfully.");
+    } catch (Exception e) {
+      // Log lỗi nếu có lỗi trong quá trình tải và cập nhật dữ liệu
+      log.logError("Error during load and update process: " + e.getMessage(), e);
+    }
+  }
+
+  //6. Update dữ liệu từ staging sang product_dim
+  public static void updateDataFromTempToProductDim() {
+    //6.1. Kết nối với staging databases và datawarehouse database
+    try (Connection stagingConnection = cof.connectToDatabase("staging");
+        Connection dataWarehouseConnection = cof.connectToDatabase("datawarehouse")) {
+
+      // Query SQL để insert hoặc update dữ liệu vào bảng Product_dim
+      String insertQuery = "INSERT INTO Product_dim (id, p_id, Name, time) VALUES (?, ?, ?, ?) "
+          + "ON DUPLICATE KEY UPDATE Name = VALUES(Name), time = VALUES(time)";
+      // Query SQL để lấy dữ liệu từ bảng TEMP
+      String selectQuery = "SELECT Id, Product FROM TEMP";
+
+      // Thực thi câu lệnh SQL
+      try (PreparedStatement selectStatement = stagingConnection.prepareStatement(selectQuery);
+           PreparedStatement insertStatement = dataWarehouseConnection.prepareStatement(insertQuery)) {
+        ResultSet resultSet = selectStatement.executeQuery();
+        int updatedRows = 0;
+        while (resultSet.next()) {
+          int id = resultSet.getInt("Id");
+          String productFromStaging = resultSet.getString("Product");
+
+          //6.2. Lấy tên sản phẩm từ bảng Product_dim trước khi cập nhật
+          String existingName = getProductNameFromProductDim(dataWarehouseConnection, id);
+
+          // Thiết lập các tham số cho câu lệnh insert
+          insertStatement.setInt(1, id);
+          insertStatement.setInt(2, id);
+          insertStatement.setString(3, productFromStaging);
+          // Thiết lập thời gian
+          insertStatement.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
+
+          // Thực hiện câu lệnh insert và lấy số hàng bị ảnh hưởng
+          int rowsAffected = insertStatement.executeUpdate();
+
+          // Lấy tên đã cập nhật từ Product_dim sau khi cập nhật
+          String updatedName = getProductNameFromProductDim(dataWarehouseConnection, id);
+
+          //6.3 Nếu có hàng bị cập nhật và tên thay đổi
+          if (rowsAffected > 0 && !Objects.equals(existingName, updatedName)) {
+            // Log thông tin về việc cập nhật hàng
+            log.logInfo("Row with id " + id + " was updated. Name changed from '" + existingName + "' to '" + updatedName + "'.");
+            // Ghi log
+            log.insertLog("Tranfer", existingName + " to " + updatedName, 2, 8);
+            updatedRows++;
+          }
+        }
+        log.logInfo(updatedRows + " rows updated from TEMP to Product_dim successfully.");
+      } catch (SQLException e) {
+        // Log lỗi khi cập nhật dữ liệu từ TEMP vào Product_dim
+        log.logError("Error while updating data from TEMP to Product_dim: " + e.getMessage(), e);
+      }
+    } catch (SQLException e) {
+      // Log lỗi khi kết nối đến cơ sở dữ liệu
+      log.logError("Error connecting to databases: " + e.getMessage(), e);
+    }
+  }
+
+
+  //7. Thêm dữ liệu vào bảng product_dim
   public static void insertDataFromTempToProductDim() {
     // 2.1. Kết nối với staging databases và datawarehouse database
     try (Connection stagingConnection = cof.connectToDatabase("staging");
@@ -54,122 +156,12 @@ public class LoadFromTempToDataWareHouse {
       log.logError("Error while connect to Datawarehouse or Staging" + e.getMessage(), e);
     }
   }
-
-  //3. Kiểm tra sản phẩm tồn tại trong table
-  public static boolean hasDataInProductDim() {
-    // Kiểm tra kết nối với datawarehouse database
-    try (Connection dataWarehouseConnection = cof.connectToDatabase("datawarehouse")) {
-      cof.updateConfigData(cof.connectToDatabase("control"), "Loading", "staging",
-          "Loading dữ liệu từ Staging sang Data Warehouse", "GiaVang_DataWarehouse", 7);
-      // Câu lệnh đếm số sản phẩm trong table product_dim của datawareehouse database
-      String countQuery = "SELECT COUNT(*) FROM Product_dim";
-      // Thực thi câu lệnh
-      try (PreparedStatement countStatement = dataWarehouseConnection.prepareStatement(
-          countQuery)) {
-        ResultSet resultSet = countStatement.executeQuery();
-        // Nếu kết quả phẩn tử đầu tiên
-        if (resultSet.next()) {
-          int count = resultSet.getInt(1);// Có tồn tại
-          return count > 0;// Trả về lớn hơn 0
-        }
-      }
-    } catch (SQLException e) {
-      // Thông báo lỗi log hệ thống
-      log.logError("Error checking data in Product_dim: " + e.getMessage(), e);
-    }
-    return false;
-  }
-
-  //4. Update dữ liệu từ staging sang product_dim
-  public static void updateDataFromTempToProductDim() {
-    // Kết nối với staging databases và datawarehouse database
-    try (Connection stagingConnection = cof.connectToDatabase("staging");
-        Connection dataWarehouseConnection = cof.connectToDatabase("datawarehouse")) {
-
-      // Query SQL để insert hoặc update dữ liệu vào bảng Product_dim
-      String insertQuery = "INSERT INTO Product_dim (id, p_id, Name, time) VALUES (?, ?, ?, ?) "
-          + "ON DUPLICATE KEY UPDATE Name = VALUES(Name), time = VALUES(time)";
-      // Query SQL để lấy dữ liệu từ bảng TEMP
-      String selectQuery = "SELECT Id, Product FROM TEMP";
-
-      // Thực thi câu lệnh SQL
-      try (PreparedStatement selectStatement = stagingConnection.prepareStatement(selectQuery);
-          PreparedStatement insertStatement = dataWarehouseConnection.prepareStatement(
-              insertQuery)) {
-        ResultSet resultSet = selectStatement.executeQuery();
-        int updatedRows = 0;
-        while (resultSet.next()) {
-          int id = resultSet.getInt("Id");
-          String productFromStaging = resultSet.getString("Product");
-
-          // Lấy tên sản phẩm từ bảng Product_dim trước khi cập nhật
-          String existingName = getProductNameFromProductDim(dataWarehouseConnection, id);
-
-          // Thiết lập các tham số cho câu lệnh insert
-          insertStatement.setInt(1, id);
-          insertStatement.setInt(2, id);
-          insertStatement.setString(3, productFromStaging);
-          // Thiết lập thời gian
-          insertStatement.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
-
-          // Thực hiện câu lệnh insert và lấy số hàng bị ảnh hưởng
-          int rowsAffected = insertStatement.executeUpdate();
-
-          // Lấy tên đã cập nhật từ Product_dim sau khi cập nhật
-          String updatedName = getProductNameFromProductDim(dataWarehouseConnection, id);
-
-          // Nếu có hàng bị cập nhật và tên thay đổi
-          if (rowsAffected > 0 && !Objects.equals(existingName, updatedName)) {
-            // Log thông tin về việc cập nhật hàng
-            log.logInfo(
-                "Row with id " + id + " was updated. Name changed from '" + existingName + "' to '"
-                    + updatedName + "'.");
-            // Ghi log
-            log.insertLog("Tranfer", existingName + " to " + updatedName, 1, 8);
-            updatedRows++;
-          }
-        }
-        log.logInfo(updatedRows + " rows updated from TEMP to Product_dim successfully.");
-      } catch (SQLException e) {
-        // Log lỗi khi cập nhật dữ liệu từ TEMP vào Product_dim
-        log.logError("Error while updating data from TEMP to Product_dim: " + e.getMessage(), e);
-      }
-    } catch (SQLException e) {
-      // Log lỗi khi kết nối đến cơ sở dữ liệu
-      log.logError("Error connecting to databases: " + e.getMessage(), e);
-    }
-  }
-
-  //5. Load Data từ Temp sang Table Product_dim
-  public static void loadDataFromTempToProductDim() {
-    try {
-      // Kiểm tra xem Product_dim có dữ liệu không
-      if (hasDataInProductDim()) {
-        // Nếu có dữ liệu, cập nhật dữ liệu từ TEMP vào Product_dim
-        updateDataFromTempToProductDim();
-        log.logInfo("Dữ liệu của Product_dim đã được cập nhật");
-        log.insertLog("Tranform", "Dữ liệu của Product_dim đã được cập nhật", 1, 6);
-      } else {
-        // Nếu không có dữ liệu, tải dữ liệu từ TEMP vào Product_dim
-        insertDataFromTempToProductDim();
-        log.logInfo("Tải dữ liệu từ temp sang Product_dim thành công");
-        log.insertLog("Loaded", "Tải dữ liệu từ temp sang Product_dim thành công", 1, 8);
-      }
-      log.logInfo("Load and update process completed successfully.");
-    } catch (Exception e) {
-      // Log lỗi nếu có lỗi trong quá trình tải và cập nhật dữ liệu
-      log.logError("Error during load and update process: " + e.getMessage(), e);
-    }
-  }
-
-  //6. Kiểm tra tương thích dữ liệu
-  private static String getProductNameFromProductDim(Connection connection, int id)
-      throws SQLException {
+  //6.2. Kiểm tra tên sản phẩm
+  private static String getProductNameFromProductDim(Connection connection, int id) throws SQLException {
     // Câu truy vấn SQL để lấy tên từ bảng Product_dim dựa trên id
     String selectQuery = "SELECT Name FROM Product_dim WHERE id = ?";
 
-    // Sử dụng try-with-resources để quản lý PreparedStatement và tự động đóng tài
-    // nguyên
+    // Sử dụng try-with-resources để quản lý PreparedStatement và tự động đóng tài nguyên
     try (PreparedStatement selectStatement = connection.prepareStatement(selectQuery)) {
       // Thiết lập tham số trong PreparedStatement
       selectStatement.setInt(1, id);
@@ -273,7 +265,7 @@ public class LoadFromTempToDataWareHouse {
       // Câu truy vấn SQL để chèn dữ liệu vào bảng data warehouse
       String insertQuery =
           "INSERT INTO giavang_datawarehouse.product_fact (Date_ef, Time, Date_ex, Product_Id, BuyingPrice, SellingPrice, Status) "
-              + "VALUES (?, ?, 7585, ?, ?, ?, 8)";
+              + "VALUES (?, ?, 2999, ?, ?, ?, 8)";
 
       // Thực hiện các câu truy vấn SQL
       try (PreparedStatement selectStatement = stagingConnection.prepareStatement(selectQuery);
