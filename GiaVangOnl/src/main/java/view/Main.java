@@ -14,7 +14,7 @@ public class Main {
 
   public static void main(String[] args) throws SQLException {
 //        cof.loadDataFromPropertiesToConfig();
-//        l1.loadDataFromTempToDataWarehouse();
+        l1.loadDataFromTempToDataWarehouse();
 //        l2.LoadDatawarehouseToDataMart();
 
   }
