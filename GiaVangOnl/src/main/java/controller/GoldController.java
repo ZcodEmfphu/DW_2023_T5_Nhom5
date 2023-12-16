@@ -11,7 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-@WebServlet("/HomeController")
+@WebServlet("/Home")
 public class GoldController extends HttpServlet {
   private static final long serialVersionUID = 1L;
 
@@ -27,7 +27,7 @@ public class GoldController extends HttpServlet {
     List<Gold> list = goldDao.getAllGold();
 
     request.setAttribute("listAllGold", list);
-    request.getRequestDispatcher("/home.jsp").forward(request, response);
+    request.getRequestDispatcher("/index.jsp").forward(request, response);
   }
 
   protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
