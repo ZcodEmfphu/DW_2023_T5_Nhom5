@@ -19,28 +19,6 @@ public class LoadFromTempToDataWareHouse {
   private static long startTime = System.currentTimeMillis();
   private static long duration = 0 * 60 * 1000;
 
-  //	1. Xóa dữ liệu trong bảng fact
-  public static void truncateProductFactTable() {
-    // 1.1. Kết nối với datawarehouse database
-    try (Connection dataWarehouseConnection = cof.connectToDatabase("datawarehouse")) {
-      String truncateQuery = "TRUNCATE TABLE product_fact";
-      // 1.2.1. Thực thi câu lệnh
-      try (PreparedStatement truncateStatement = dataWarehouseConnection.prepareStatement(
-          truncateQuery)) {
-        truncateStatement.executeUpdate();
-        // 1.3.1. Ghi log hệ thống về việc tranform(update) dữ liệu mới
-        log.insertLog("Update", "Update Product_Fact thành công", 1, 5);
-      } catch (SQLException e) {
-        // 1.3.2. Ghi log về sự cố lỗi khi update dữ liệu
-        log.insertLog("Update", "Error while update Product_Fact", 1, 10);
-      }
-    } catch (SQLException e) {
-      // 1.2.2. Kết nối với datawarehouse database lỗi
-      log.insertLog("Connect", "Error while connect to Datawarehouse", 1, 10);
-      log.logError("Error while connect to Datawarehouse" + e.getMessage(), e);
-    }
-  }
-
   //2. Load dữ liệu vào bảng product_dim
   public static void insertDataFromTempToProductDim() {
     // 2.1. Kết nối với staging databases và datawarehouse database
@@ -81,6 +59,8 @@ public class LoadFromTempToDataWareHouse {
   public static boolean hasDataInProductDim() {
     // Kiểm tra kết nối với datawarehouse database
     try (Connection dataWarehouseConnection = cof.connectToDatabase("datawarehouse")) {
+      cof.updateConfigData(cof.connectToDatabase("control"), "Loading", "staging",
+          "Loading dữ liệu từ Staging sang Data Warehouse", "GiaVang_DataWarehouse", 7);
       // Câu lệnh đếm số sản phẩm trong table product_dim của datawareehouse database
       String countQuery = "SELECT COUNT(*) FROM Product_dim";
       // Thực thi câu lệnh
