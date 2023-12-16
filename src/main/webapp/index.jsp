@@ -1,6 +1,6 @@
 <%@ page import="java.util.List" %>
-<%@ page import="main.model.Gold" %>
-<%@ page import="main.db.Dao" %>
+<%@ page import="model.Gold" %>
+<%@ page import="db.Dao" %>
 
 <!DOCTYPE html>
 <%@ page contentType="text/html;charsetUTF-8" language="java" pageEncoding="utf-8"%>
